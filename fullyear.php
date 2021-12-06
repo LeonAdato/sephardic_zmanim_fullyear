@@ -16,7 +16,7 @@ AUTHOR: Leon Adato
 VERSION HISTORY
 	0.0.1 - 0.0.10 - development
 	0.1.0 - first pre-prod version
-  1.0.0 - 12/5/2021 first production version.
+	1.0.0 - first prod version
 
 DESCRIPTION	
 Get Sephardic Zmanim for a complete year
@@ -26,7 +26,7 @@ Formats output as HTML page
     
 USAGE
 ==========
-this page is served from a web server via PHP
+this page is served from a web server via PHP and API calls
 along with the URL/URI, variables can include:
 
 hebyear=yyyy
@@ -43,9 +43,8 @@ city=(city name)
 	location specified by one of the Hebcal.com legacy city identifiers (https://github.com/hebcal/dotcom/blob/master/hebcal.com/dist/cities2.txt). Mutually exclusive from zip, geoname, or lat/long.
 
 If hebyear is blank, the current year will be used.
-
 If no location information is given, the location of the Sephardic Congregation of Cleveland will be used
-(latitude=41.4902062 longitude=-81.517477 time zone=America/New_York")
+(latitude=41.4902062 longitude=-81.517477 tzid=America/New_York)
 
 EXTERNAL SOURCE(S)
 ======================
