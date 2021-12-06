@@ -110,7 +110,7 @@ if ($latitude){
 }
 if ($longitude){
 	if ($longitude >= -180 && $longitude <=-180) {
-	} else {geo=pos&latitude=41.4902062&longitude=-81.517477&tzid=America/New_York";
+	} else {
     	echo("<H2>Not a valid longitude coordinate</h2>\n");
     	exit(1);
 	}
