@@ -1,6 +1,5 @@
 <?php
-//NOTE TO LEON - REMOVE IN PUBLIC VERSION
-//this the username for http://www.geonames.org/, used to locate time zone based on lat/long information
+//this the username for http://www.geonames.org/, used to locate time zone and lat/long information
 $tzusername="";
 
 /*
@@ -16,7 +15,8 @@ AUTHOR: Leon Adato
 VERSION HISTORY
 	0.0.1 - 0.0.10 - development
 	0.1.0 - first pre-prod version
-	1.0.0 - first prod version
+	0.1.1 - switched to internal php function for sunrise/sunset instead of API call
+	0.1.2 - added more complete styling; zip code and address input
 
 DESCRIPTION	
 Get Sephardic Zmanim for a complete year
@@ -26,7 +26,7 @@ Formats output as HTML page
     
 USAGE
 ==========
-this page is served from a web server via PHP and API calls
+this page is served from a web server or at the commandline
 along with the URL/URI, variables can include:
 
 hebyear=yyyy
@@ -42,9 +42,6 @@ geoname=######
 city=(city name)
 	location specified by one of the Hebcal.com legacy city identifiers (https://github.com/hebcal/dotcom/blob/master/hebcal.com/dist/cities2.txt). Mutually exclusive from zip, geoname, or lat/long.
 
-If hebyear is blank, the current year will be used.
-If no location information is given, the location of the Sephardic Congregation of Cleveland will be used
-(latitude=41.4902062 longitude=-81.517477 tzid=America/New_York)
 
 EXTERNAL SOURCE(S)
 ======================
@@ -52,22 +49,24 @@ https://www.hebcal.com/home/developer-apis
 http://www.geonames.org/ (using this API requires a login)
 */
 
-//initial variables
-date_default_timezone_set('America/New_York');
-
 //set variables
+$tzurl = $tzid = $get_tzname = "";
+$zipcode = $zipurl = $zipid = $get_zipinfo = "";
+$zmanurl = $zmanresponse = $get_zmanim = $getzmanim = $get_shabbats = "";
+$hebyear = $nexthebyear = $latitude = $longitude = "";
+$address = $addurl = $addurlencoded = $get_addinfo = "";
 $candles = $candletext = $frisunset = $frimincha = $satmincha = $satsunset = $satarvit = $sattzet = $latemotzei = "";
 $SukkotDate = $PesachDate = "";
-$hebyear = $nexthebyear = $startdate = $enddate = $friday = $saturday = $category = "";
-$zipcode = $city = $geoname = $latitude = $longitude = "";
-$datearray = $shabbatarray = array(); 
+$startdate = $enddate = $friday = $saturday = $category = "";
+$UTC = $newTZ = $UTCfrisunset = $UTCfrisunrise = "";
+$datearray = $shabbatarray = $zipresponse = $addresponse = $tzresponse = array(); 
+
 
 //get location, year, and other common variables like you do with the weekly times
 //get incoming variables
 if(isset($_GET['hebyear'])) {$hebyear=stripcslashes($_GET['hebyear']);}
 if(isset($_GET['zipcode'])) {$zipcode=stripcslashes($_GET['zipcode']); }
-if(isset($_GET['city'])) {$city=stripcslashes($_GET['city']); }
-if(isset($_GET['geoname'])) {$geoname=stripcslashes($_GET['geoname']); }
+if(isset($_GET['address'])) {$address=stripcslashes($_GET['address']); }
 if(isset($_GET['lat'])) {$latitude=stripcslashes($_GET['lat']); }
 if(isset($_GET['long'])) {$longitude=stripcslashes($_GET['long']); }
 
@@ -85,7 +84,6 @@ if ($hebyear){
 	$zmanresponse = json_decode($get_zmanim, true);
 	$hebyear = $zmanresponse['hy'];
 }
-
 if ($zipcode){
 	if (preg_match('/^[0-9]{5}$/', $zipcode)) {
 	} else {
@@ -93,12 +91,10 @@ if ($zipcode){
     	exit(1);
 	}
 }
-if ($geoname){
-	if (preg_match('/^[0-9]{7}$/', $geoname)) {
-	} else {
-    	echo("<H2>not a valid 7 digit Geoname code</h2>\n");
-    	exit(1);
-	}
+if ($address) {
+	$address = htmlspecialchars($address);
+   $address = stripslashes($address);
+   $address = trim($address);
 }
 if ($latitude){
 	if ($latitude >= -90 && $latitude <=-90) {
@@ -116,16 +112,32 @@ if ($longitude){
 }
 
 //set location
-if ($zipcode) {
-	$geostring="zip=$zipcode";
-	$locstring = "Zipcode $zipcode";
-}elseif ($geoname) {
-	$geostring="geo=geoname&geonameid=$geoname";
-	$locstring = "Geoname ID $geoname";
-} elseif ($city) {
-	$geostring="geo=city&city=$city";
-	$locstring = "City $city";
-} elseif ($latitude && $longitude ) {
+if ($zipcode != "") {
+	$zipurl = "http://api.geonames.org/postalCodeSearchJSON?postalcode=$zipcode&country=US&username=$tzusername";
+	$get_zipinfo = callAPI('GET', $zipurl, false);
+	$zipresponse = json_decode($get_zipinfo, true);
+	$latitude = $zipresponse['postalCodes']['0']['lat'];
+	$longitude = $zipresponse['postalCodes']['0']['lng'];
+	$tzurl = "http://api.geonames.org/timezoneJSON?lat=$latitude&lng=$longitude&username=$tzusername";
+	$get_tzname = callAPI('GET', $tzurl, false);
+	$tzresponse = json_decode($get_tzname, true);
+	$tzid = $tzresponse['timezoneId'];
+	$geostring = "geo=pos&latitude=$latitude&longitude=$longitude&tzid=$tzid";
+	$locstring = "Lat: $latitude, Long $longitude, Timezone $tzid";
+} elseif ($address != "") {
+	$addurlencoded = urlencode($address);
+	$addurl = "http://api.geonames.org/geoCodeAddressJSON?q=\"$addurlencoded\"&username=$tzusername";
+	$get_addinfo = callAPI('GET', $addurl, false);
+	$addresponse = json_decode($get_addinfo, true);
+	$latitude = $addresponse['address']['lat'];
+	$longitude = $addresponse['address']['lng'];
+	$tzurl = "http://api.geonames.org/timezoneJSON?lat=$latitude&lng=$longitude&username=$tzusername";
+	$get_tzname = callAPI('GET', $tzurl, false);
+	$tzresponse = json_decode($get_tzname, true);
+	$tzid = $tzresponse['timezoneId'];
+	$geostring = "geo=pos&latitude=$latitude&longitude=$longitude&tzid=$tzid";
+	$locstring = "Lat: $latitude, Long $longitude, Timezone $tzid";
+} elseif ($latitude  != "" && $longitude != "") {
 	$tzurl = "http://api.geonames.org/timezoneJSON?lat=$latitude&lng=$longitude&username=$tzusername";
 	$get_tzname = callAPI('GET', $tzurl, false);
 	$tzresponse = json_decode($get_tzname, true);
@@ -133,8 +145,12 @@ if ($zipcode) {
 	$geostring = "geo=pos&latitude=$latitude&longitude=$longitude&tzid=$tzid";
 	$locstring = "Lat: $latitude, Long $longitude, Timezone $tzid";
 } else {
-	$geostring = "geo=pos&latitude=41.4902062&longitude=-81.517477&tzid=America/New_York";
+	$latitude = "41.4902062";
+	$longitude = "-81.517477";
+	$tzid = "America/New_York";
+	$geostring = "geo=pos&latitude=$latitude&longitude=$longitude&tzid=$tzid";
 	$locstring = "Cleveland Sephardic Minyan Kollel Building";
+	
 }
 
 //get this year RH, Sukkot, Pesach, 
@@ -192,10 +208,10 @@ foreach($shabbatresponse['items'] as $shabbatitem) {
 
 // check associative array if $saturday is already there and has a category of "parashat"
 	if (array_key_exists($shabbatdate, $datearray) && $datearray[$shabbatdate]['category'] == "parashat") {
-		echo "entry $shabbatdate exists and category is parashat <br>";
+		//echo "entry $shabbatdate exists and category is parashat <br>";
 		continue;
 	} else {
-		$timeinfo = getzmanim($friday, $geostring, $SukkotDate, $PesachDate);
+		$timeinfo = getzmanim($friday, $latitude, $longitude, $geostring, $tzid, $SukkotDate, $PesachDate);
 		$candletext = $timeinfo[0];
 		$frisunset = $timeinfo[1];
 		$frimincha = $timeinfo[2];
@@ -222,8 +238,14 @@ foreach($shabbatresponse['items'] as $shabbatitem) {
 		);
 	}	
 }
-echo "<img src=\"header.png\" width=\"1100\"><br>";
-echo "<table border=1><tr><td>Saturday</td><td>Parsha</td><td>Hebrew</td><td>Candles</td><td>Fri Shkia</td><td>Fri Mincha</td><td>Sat Mincha</td><td>Sat Shkia</td><td>Sat Arvit</td><td>Motzei 45/72</td></tr>";
+echo "<!DOCTYPE html>
+<html>
+<head>
+    <title>Sephardic Congregation of Cleveland Zmanim</title>
+</head>
+<body>
+<img src=\"header.png\" width=\"1100\">
+<table border=1><tr><td>Saturday</td><td>Parsha</td><td>Hebrew</td><td>Candles</td><td>Fri Shkia</td><td>Fri Mincha</td><td>Sat Mincha</td><td>Sat Shkia</td><td>Sat Arvit</td><td>Motzei 45/72</td></tr>";
 
 foreach($datearray as $shabbatdate => $shabbatvalue) {
 	$zmanstring ="<tr><td>" . $shabbatdate . "</td><td>" . $shabbatvalue['englishparashat'] . "</td><td style=\"text-align:right\">" . $shabbatvalue['hebrewparashat'] . "</td><td>" . $shabbatvalue['candletext'] . "</td><td>" . $shabbatvalue['frisunset'] . "</td><td>" . $shabbatvalue['frimincha'] . "</td><td>" . $shabbatvalue['satmincha'] . "</td><td>" . $shabbatvalue['satsunset'] . "</td><td>" . $shabbatvalue['satarvit'] . "</td><td>" . $shabbatvalue['sattzet'] . "/" . $shabbatvalue['latemotzei'] . "</td></tr>";
@@ -231,23 +253,35 @@ foreach($datearray as $shabbatdate => $shabbatvalue) {
 	}
 
 
-echo "</table>";
+echo "</table>
+<P>NOTE: Times are calculated automatically based on the location informatin provided. Because zip codes can cover a large area; and because of variations in things like the source of sunrise/sunset, height of elevation, rounding seconds to minutes, etc. times may be off by as much as 2 minutes. Please plan accordingly.</P>
+</body>
+</html>";
 
-function getzmanim($friday, $geostring, $SukkotDate, $PesachDate){
-	$friurl = "https://www.hebcal.com/zmanim?cfg=json&$geostring&date=$friday";
-	$get_fritimes = callAPI('GET', $friurl, false);
-	$friresponse = json_decode($get_fritimes, true);
-	
+function getzmanim($friday, $latitude, $longitude, $geostring, $tzid ,$SukkotDate, $PesachDate){
+	$UTC = new DateTimeZone("UTC");
+	$newTZ = new DateTimeZone($tzid);
+
+	$fri_sun_info = date_sun_info(strtotime($friday), floatval($latitude), floatval($longitude));
+	$UTCfrisunrise = new DateTime(date("Y-m-d H:i:s", $fri_sun_info['sunrise']), $UTC);
+	$UTCfrisunrise -> setTimeZone($newTZ);
+	$frisunrise = $UTCfrisunrise -> format('g:i a');
+
+	$UTCfrisunset = new DateTime(date("Y-m-d H:i:s", $fri_sun_info['sunset']), $UTC);
+	$UTCfrisunset -> setTimeZone($newTZ);
+	$frisunset = $UTCfrisunset -> format('g:i a');
+
 	$saturday= date('Y-m-d', strtotime( $friday . " +1 days"));
-	$saturl = "https://www.hebcal.com/zmanim?cfg=json&$geostring&date=$saturday";
-	$get_sattimes = callAPI('GET', $saturl, false);
-	$satresponse = json_decode($get_sattimes, true);
+	$sat_sun_info = date_sun_info(strtotime($saturday), floatval($latitude), floatval($longitude));
+	$UTCsatsunrise = new DateTime(date("Y-m-d H:i:s", $sat_sun_info['sunrise']), $UTC);
+	$UTCsatsunrise -> setTimeZone($newTZ);
+	$satsunrise = $UTCsatsunrise -> format('g:i a');
+
+	$UTCsatsunset = new DateTime(date("Y-m-d H:i:s", $sat_sun_info['sunset']), $UTC);
+	$UTCsatsunset -> setTimeZone($newTZ);
+	$satsunset = $UTCsatsunset -> format('g:i a');
 
 	//FIXED TIMES
-	$frisunrise = date('g:i a', strtotime($friresponse['times']['sunrise']));
-	$frisunset = date('g:i a', strtotime($friresponse['times']['sunset']));
-	$satsunrise = date('g:i a', strtotime($satresponse['times']['sunrise']));
-	$satsunset = date('g:i a', strtotime($satresponse['times']['sunset']));
 	$friyr = date('Y',strtotime($friday));
 	$frimo = date('m',strtotime($friday));
 	$frid = date('d',strtotime($friday));
