@@ -6,31 +6,29 @@
 <table border=1><tr><td>
 	<form action="fullyear.php" method="get">
 
-	<P>The Hebrew year you want times for. (If blank, we'll use the current year)<br>
-	<label for="hebyear">Date: </label>
-	<input type="text" id="hebyear" name="hebyear"></P>
+	<P>The Hebrew year you want times for.<br> (If blank, we'll use the current year)<br>
+	<label for="hebyear">Date: </label><input type="text" id="hebyear" name="hebyear"><br>
+	Example: 5783</P>
 
 </td></tr><tr><td>
-	<P>You can indicate what location times will be calculated for, using ONE of the following methods:<br>
+	<P>Provide the address, zip code, or exact (latitude/longitude) location:<br>
 	If you leave this section blank, it will assume the Sephardic Congregation of Cleveland location.<br><br>
 
-	Zip Code: <input type="text" name="zipcode" value=""><br><br>
+	<label for="address">Address: </label><input type="text" name="address" value=""><br>
+	Example: 2480 S. Green Rd., University Heights, OH 44118<br><br>
 
 	----OR----<br><br>
 
-	Hebcal.com legacy city identifiers (for the full list, <A HREF="https://github.com/hebcal/dotcom/blob/master/hebcal.com/dist/cities2.txt">click this link</A>).<br>
-	City: <input type="text" name="city" value=""><br><br>
+	<label for="zipcode">Zip Code: </label>
+	<input type="text" name="zipcode" value=""><br>
+	Example: 44118<br><BR>
+NOTE: Times are calculated automatically based on the location informatin provided. Because zip codes can cover a large area; and because of variations in things like the source of sunrise/sunset, height of elevation, rounding seconds to minutes, etc. times may be off by as much as 15 minutes. Please plan accordingly.<br><br>
 
 	----OR----<br><br>
-
-	GeoNames.org numeric ID (For a full list, see the file "cities5000.zip" from <A HREF="https://download.geonames.org/export/dump/">this link</A>.)<br>
-	GeoName: <input type="text" name="geoname" value=""><br><br>
-
-	----OR----<br><br>
-
+	
 	Exact Latitude and Longitude.<br>
-	Latitude: <input type="text" name="lat" value=""><br>
-	Longitude: <input type="text" name="long" value=""></P>
+	<label for="lat">Latitude: </label> <input type="text" name="lat" value=""><br>
+	<label for="long">Longitude: </label><input type="text" name="long" value=""></P>
 
 </td></tr><tr><td>
 	<input type="submit" value="Go!">
