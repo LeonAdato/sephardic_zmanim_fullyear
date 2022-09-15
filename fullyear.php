@@ -1,6 +1,8 @@
 <?php
-//this the username for http://www.geonames.org/, used to locate time zone and lat/long information
-$tzusername="";
+//this the username for http://www.geonames.org/, used to locate time zone based on lat/long information
+//you MUST update zmansettings.ini with your geonames account or the script won't work
+$ini_array = parse_ini_file("zmansettings.ini");
+$tzusername= $ini_array['tzusername'];
 
 /*
 FUTURE TODO
@@ -17,7 +19,9 @@ VERSION HISTORY
 	0.1.0 - first pre-prod version
 	0.1.1 - switched to internal php function for sunrise/sunset instead of API call
 	0.1.2 - added more complete styling; zip code and address input
-
+	0.1.3 - formatting updates so times fit on one line.
+	0.1.4 - added debug option; fixed category duplicates for havdalah, candles, holiday
+	0.1.5 - added ini for account information
 DESCRIPTION	
 Get Sephardic Zmanim for a complete year
 Pulls information from external sites via API
@@ -50,7 +54,7 @@ http://www.geonames.org/ (using this API requires a login)
 */
 
 //set variables
-$tzurl = $tzid = $get_tzname = "";
+$tzurl = $tzid = $get_tzname = $tzoff = $offset = "";
 $zipcode = $zipurl = $zipid = $get_zipinfo = "";
 $zmanurl = $zmanresponse = $get_zmanim = $getzmanim = $get_shabbats = "";
 $hebyear = $nexthebyear = $latitude = $longitude = "";
@@ -59,8 +63,8 @@ $candles = $candletext = $frisunset = $frimincha = $satmincha = $satsunset = $sa
 $SukkotDate = $PesachDate = "";
 $startdate = $enddate = $friday = $saturday = $category = "";
 $UTC = $newTZ = $UTCfrisunset = $UTCfrisunrise = "";
-$datearray = $shabbatarray = $zipresponse = $addresponse = $tzresponse = array(); 
-
+$datearray = $shabbatarray = $zipresponse = $addresponse = $tzresponse = array();
+$debug = 0; 
 
 //get location, year, and other common variables like you do with the weekly times
 //get incoming variables
@@ -69,6 +73,7 @@ if(isset($_GET['zipcode'])) {$zipcode=stripcslashes($_GET['zipcode']); }
 if(isset($_GET['address'])) {$address=stripcslashes($_GET['address']); }
 if(isset($_GET['lat'])) {$latitude=stripcslashes($_GET['lat']); }
 if(isset($_GET['long'])) {$longitude=stripcslashes($_GET['long']); }
+if(isset($_GET['debug'])) {$debug=stripcslashes($_GET['debug']); }
 
 //sanitize some initial inputs
 if ($hebyear){
@@ -110,6 +115,12 @@ if ($longitude){
     	exit(1);
 	}
 }
+if ($debug ==1 || $debug == 0) {
+} else {
+    echo("<H2>Debug must be 0 or 1</h2>\n");
+    exit(1);
+}
+
 
 //set location
 if ($zipcode != "") {
@@ -145,12 +156,13 @@ if ($zipcode != "") {
 	$geostring = "geo=pos&latitude=$latitude&longitude=$longitude&tzid=$tzid";
 	$locstring = "Lat: $latitude, Long $longitude, Timezone $tzid";
 } else {
-	$latitude = "41.4902062";
-	$longitude = "-81.517477";
+	# kollel $latitude = "41.4902062";
+	# kollel $longitude = "-81.517477";
+	$latitude = "41.4939407";
+	$longitude = "-81.516709";
 	$tzid = "America/New_York";
 	$geostring = "geo=pos&latitude=$latitude&longitude=$longitude&tzid=$tzid";
-	$locstring = "Cleveland Sephardic Minyan Kollel Building";
-	
+	$locstring = "BKCS Building";
 }
 
 //get this year RH, Sukkot, Pesach, 
@@ -182,36 +194,39 @@ $enddate = date('Y-m-d', mktime(0,0,0,$zmanresponse['gm'],$zmanresponse['gd'],$z
 
 // Get list of shabbatot
 $shabbatsurl = "https://www.hebcal.com/hebcal?v=1&cfg=json&maj=on&min=off&nx=off&mf=off&ss=off&s=on&c=off&i=off&leyning=off&$geostring&start=$startdate&end=$enddate";
-//echo "shabbatsurl: $shabbatsurl <br>";
 $get_shabbats = callAPI('GET', $shabbatsurl, false);
 $shabbatresponse = json_decode($get_shabbats, true);
+$gotit = 3;
 
 foreach($shabbatresponse['items'] as $shabbatitem) {
-	$shabbatdate = $shabbatitem['date'];
+	$shabbatdate = date('Y-m-d', strtotime($shabbatitem['date']));
 	if (date('w', strtotime($shabbatdate))!=6) {continue;}
 	$saturday = $shabbatdate;
 	$friday= date('Y-m-d', strtotime( $saturday . " -1 days"));
-	$englishparashat = $shabbatitem['title'];
-	$hebrewparashat = $shabbatitem['hebrew'];
 	$category = $shabbatitem['category'];
-
-	if ($englishparashat == "") {
-		foreach($shabbatresponse['items'] as $shabbatitem) {
-		if (date('Y-m-d', strtotime($shabbatitem['date'])) == $saturday) {
-			if ($shabbatitem['category'] == "candles") {
-				$englishparashat = $shabbatitem['memo'];
-				}
-			}
-		}
+	if($category == "parashat" || $category == "holiday") {
+		$englishparashat = $shabbatitem['title'];
+		$hebrewparashat = $shabbatitem['hebrew'];
+		} #end if parashat or holiday
+	if($category == "candles") {
+		$englishparashat = $shabbatitem['memo'];
+		$hebrewparashat = $shabbatitem['hebrew'];
+		} #end if candles
 	
-	}
-
 // check associative array if $saturday is already there and has a category of "parashat"
 	if (array_key_exists($shabbatdate, $datearray) && $datearray[$shabbatdate]['category'] == "parashat") {
 		//echo "entry $shabbatdate exists and category is parashat <br>";
 		continue;
+	} elseif(array_key_exists($shabbatdate, $datearray) && $datearray[$shabbatdate]['category'] == "holiday")  {
+		continue;
 	} else {
-		$timeinfo = getzmanim($friday, $latitude, $longitude, $geostring, $tzid, $SukkotDate, $PesachDate);
+		//set timezone offset
+		$tz = new DateTimeZone($tzid);
+		$datetime = date_create($friday, new DateTimeZone("GMT"));
+		$tzoff = timezone_offset_get($tz, $datetime );
+		$offset = $tzoff/3600;
+
+		$timeinfo = getzmanim($friday, $latitude, $longitude, $geostring, $tzid, $SukkotDate, $PesachDate, $offset);
 		$candletext = $timeinfo[0];
 		$frisunset = $timeinfo[1];
 		$frimincha = $timeinfo[2];
@@ -238,6 +253,14 @@ foreach($shabbatresponse['items'] as $shabbatitem) {
 		);
 	}	
 }
+
+if($debug == 1) {
+	echo "shabbatsurl: $shabbatsurl <br>";
+	echo "offset is $offset<br>";
+	echo "timezone is $tzid<br>";
+
+}
+
 echo "<!DOCTYPE html>
 <html>
 <head>
@@ -258,36 +281,26 @@ echo "</table>
 </body>
 </html>";
 
-function getzmanim($friday, $latitude, $longitude, $geostring, $tzid ,$SukkotDate, $PesachDate){
-	$UTC = new DateTimeZone("UTC");
-	$newTZ = new DateTimeZone($tzid);
-
-	$fri_sun_info = date_sun_info(strtotime($friday), floatval($latitude), floatval($longitude));
-	$UTCfrisunrise = new DateTime(date("Y-m-d H:i:s", $fri_sun_info['sunrise']), $UTC);
-	$UTCfrisunrise -> setTimeZone($newTZ);
-	$frisunrise = $UTCfrisunrise -> format('g:i a');
-
-	$UTCfrisunset = new DateTime(date("Y-m-d H:i:s", $fri_sun_info['sunset']), $UTC);
-	$UTCfrisunset -> setTimeZone($newTZ);
-	$frisunset = $UTCfrisunset -> format('g:i a');
-
+function getzmanim($friday, $latitude, $longitude, $geostring, $tzid ,$SukkotDate, $PesachDate, $offset){
+	$frisunrise = date_sunrise(strtotime($friday),SUNFUNCS_RET_STRING,$latitude,$longitude,90.83,$offset);
+	$frisunrise = date('g:ia', strtotime($frisunrise));
+	$frisunset = date_sunset(strtotime($friday),SUNFUNCS_RET_STRING,$latitude,$longitude,90.83,$offset);
+	$frisunset = date('g:ia', strtotime($frisunset));
 	$saturday= date('Y-m-d', strtotime( $friday . " +1 days"));
-	$sat_sun_info = date_sun_info(strtotime($saturday), floatval($latitude), floatval($longitude));
-	$UTCsatsunrise = new DateTime(date("Y-m-d H:i:s", $sat_sun_info['sunrise']), $UTC);
-	$UTCsatsunrise -> setTimeZone($newTZ);
-	$satsunrise = $UTCsatsunrise -> format('g:i a');
-
-	$UTCsatsunset = new DateTime(date("Y-m-d H:i:s", $sat_sun_info['sunset']), $UTC);
-	$UTCsatsunset -> setTimeZone($newTZ);
-	$satsunset = $UTCsatsunset -> format('g:i a');
+	$satsunrise = date_sunrise(strtotime($saturday),SUNFUNCS_RET_STRING,$latitude,$longitude,90.83,$offset);
+	$satsunrise = date('g:ia', strtotime($satsunrise));
+	$satsunset = date_sunset(strtotime($saturday),SUNFUNCS_RET_STRING,$latitude,$longitude,90.83,$offset);
+	$satsunset = date('g:ia', strtotime($satsunset));
 
 	//FIXED TIMES
 	$friyr = date('Y',strtotime($friday));
 	$frimo = date('m',strtotime($friday));
 	$frid = date('d',strtotime($friday));
 
-// is this Friday after Sukkot and before Pesach? If so, $isearly==0
-	if( $friday > $SukkotDate && $friday < $PesachDate) {
+	// OLD: is this Friday after Sukkot and before Pesach? If so, $isearly==0
+	//if( $friday > $SukkotDate && $friday < $PesachDate) {
+	// is shkia later than 7:35? Then mincha is early. otherwise it's at zman ()
+	if(strtotime($frisunset) <= strtotime("7:35pm")) {
 		$isearly=0;
 	} else {
 		$isearly=1;
@@ -295,17 +308,17 @@ function getzmanim($friday, $latitude, $longitude, $geostring, $tzid ,$SukkotDat
 
 	//SIMPLE CALCULATIONS
 	// Shabbat candles = fri shkia - 18
-		$candles = date('g:i a', strtotime( $frisunset . " -18 minutes"));
+		$candles = date('g:ia', strtotime( $frisunset . " -18 minutes"));
 	// tzet hakochavim = shkia + 45
 	// early Motzi Shabbat is the same as tzet
 		$fritzet = date('g:i a', strtotime( $frisunset . " +45 minutes"));
-		$sattzet = date('g:i a', strtotime( $satsunset . " +45 minutes"));
+		$sattzet = date('g:ia', strtotime( $satsunset . " +45 minutes"));
 	// Late Motzi Shabbat Shkia+72 
-		$latemotzei = date('g:i a', strtotime( $satsunset . " +72 minutes"));
+		$latemotzei = date('g:ia', strtotime( $satsunset . " +72 minutes"));
 	// Saturday Mincha = Shkia-40 minutes 
-		$satmincha = date('g:i a', strtotime( $satsunset . " -40 minutes"));
+		$satmincha = date('g:ia', strtotime( $satsunset . " -40 minutes"));
 	// Saturday Arvit = Shkia+50 minutes
-		$satarvit = date('g:i a', strtotime( $satsunset . " +50 minutes"));
+		$satarvit = date('g:ia', strtotime( $satsunset . " +50 minutes"));
 	// Alot Hashachar ("alot") = netz-((shkia-netz)/10)
 		$frialot = date('g:i a', strtotime($frisunrise)-((strtotime($frisunset) - strtotime($frisunrise))/10));
 		$satalot = date('g:i a', strtotime($satsunrise)-((strtotime($satsunset) - strtotime($satsunrise))/10));
@@ -328,10 +341,10 @@ function getzmanim($friday, $latitude, $longitude, $geostring, $tzid ,$SukkotDat
 	// "winter" mincha = Shkia-20 
 		if ($isearly == 0) { 
 			$candletext = "$candles";
-			$frimincha = date('g:i a', strtotime( $frisunset . " -20 minutes"));
+			$frimincha = date('g:ia', strtotime( $frisunset . " -20 minutes"));
 		} else {
-			$candletext = "$friplag / $candles";
-			$frimincha = date('g:i a', strtotime( $friplag . " -20 minutes"));
+			$candletext = "$friplag/$candles";
+			$frimincha = date('g:ia', strtotime( $friplag . " -20 minutes"));
 		}
 
 
