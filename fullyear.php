@@ -59,7 +59,8 @@ $zipcode = $zipurl = $zipid = $get_zipinfo = "";
 $zmanurl = $zmanresponse = $get_zmanim = $getzmanim = $get_shabbats = "";
 $hebyear = $nexthebyear = $latitude = $longitude = "";
 $address = $addurl = $addurlencoded = $get_addinfo = "";
-$candles = $candletext = $frisunset = $frimincha = $satmincha = $satsunset = $satarvit = $sattzet = $latemotzei = "";
+$candles = $candletext = $frisunset = $satmincha = $satsunset = $satarvit = $sattzet = $latemotzei = "";
+$frimincha = $friminchakorb = $friminchaashrei = $friminchatext = "";
 $SukkotDate = $PesachDate = "";
 $startdate = $enddate = $friday = $saturday = $category = "";
 $UTC = $newTZ = $UTCfrisunset = $UTCfrisunrise = "";
@@ -268,7 +269,7 @@ echo "<!DOCTYPE html>
 </head>
 <body>
 <img src=\"header.png\" width=\"1100\">
-<table border=1><tr><td>Saturday</td><td>Parsha</td><td>Hebrew</td><td>Candles</td><td>Fri Shkia</td><td>Fri Mincha</td><td>Sat Mincha</td><td>Sat Shkia</td><td>Sat Arvit</td><td>Motzei 45/72</td></tr>";
+<table border=1><tr><td>Saturday</td><td>Parsha</td><td>Hebrew</td><td>Candles<br>early / zman</td><td>Fri<br>Shkia</td><td>Fri Mincha<br>korb / ashrei</td><td>Sat<br>Mincha</td><td>Sat<br>Shkia</td><td>Sat<br>Arvit</td><td>Motzei<br>45min / 72min</td></tr>";
 
 foreach($datearray as $shabbatdate => $shabbatvalue) {
 	$zmanstring ="<tr><td>" . $shabbatdate . "</td><td>" . $shabbatvalue['englishparashat'] . "</td><td style=\"text-align:right\">" . $shabbatvalue['hebrewparashat'] . "</td><td>" . $shabbatvalue['candletext'] . "</td><td>" . $shabbatvalue['frisunset'] . "</td><td>" . $shabbatvalue['frimincha'] . "</td><td>" . $shabbatvalue['satmincha'] . "</td><td>" . $shabbatvalue['satsunset'] . "</td><td>" . $shabbatvalue['satarvit'] . "</td><td>" . $shabbatvalue['sattzet'] . "/" . $shabbatvalue['latemotzei'] . "</td></tr>";
@@ -311,7 +312,7 @@ function getzmanim($friday, $latitude, $longitude, $geostring, $tzid ,$SukkotDat
 		$candles = date('g:ia', strtotime( $frisunset . " -18 minutes"));
 	// tzet hakochavim = shkia + 45
 	// early Motzi Shabbat is the same as tzet
-		$fritzet = date('g:i a', strtotime( $frisunset . " +45 minutes"));
+		$fritzet = date('g:ia', strtotime( $frisunset . " +45 minutes"));
 		$sattzet = date('g:ia', strtotime( $satsunset . " +45 minutes"));
 	// Late Motzi Shabbat Shkia+72 
 		$latemotzei = date('g:ia', strtotime( $satsunset . " +72 minutes"));
@@ -320,36 +321,40 @@ function getzmanim($friday, $latitude, $longitude, $geostring, $tzid ,$SukkotDat
 	// Saturday Arvit = Shkia+50 minutes
 		$satarvit = date('g:ia', strtotime( $satsunset . " +50 minutes"));
 	// Alot Hashachar ("alot") = netz-((shkia-netz)/10)
-		$frialot = date('g:i a', strtotime($frisunrise)-((strtotime($frisunset) - strtotime($frisunrise))/10));
-		$satalot = date('g:i a', strtotime($satsunrise)-((strtotime($satsunset) - strtotime($satsunrise))/10));
+		$frialot = date('g:ia', strtotime($frisunrise)-((strtotime($frisunset) - strtotime($frisunrise))/10));
+		$satalot = date('g:ia', strtotime($satsunrise)-((strtotime($satsunset) - strtotime($satsunrise))/10));
 	// Sha'a (halachic hour) = (tzait - Alot) / 12 
 		$frishaa = (strtotime($fritzet)-strtotime($frialot))/12;
 		$satshaa = (strtotime($sattzet)-strtotime($satalot))/12;
 
 	//COMPOUND CALCULATIONS
 	// Mincha Gedola = 6.5 sha’a after ‘alot 
-		$friminchged = date('g:i a', strtotime($frialot)+(((strtotime($fritzet)-strtotime($frialot))/12)*6.5));
-		$satminchged = date('g:i a', strtotime($satalot)+(((strtotime($sattzet)-strtotime($satalot))/12)*6.5));
+		$friminchged = date('g:ia', strtotime($frialot)+(((strtotime($fritzet)-strtotime($frialot))/12)*6.5));
+		$satminchged = date('g:ia', strtotime($satalot)+(((strtotime($sattzet)-strtotime($satalot))/12)*6.5));
 	// Mincha ketana = 9.5 sha’a after ‘alot 
-		$friminchkat = date('g:i a', strtotime($frialot)+(((strtotime($fritzet)-strtotime($frialot))/12)*9.5));
-		$satminchkat = date('g:i a', strtotime($satalot)+(((strtotime($sattzet)-strtotime($satalot))/12)*9.5));
+		$friminchkat = date('g:ia', strtotime($frialot)+(((strtotime($fritzet)-strtotime($frialot))/12)*9.5));
+		$satminchkat = date('g:ia', strtotime($satalot)+(((strtotime($sattzet)-strtotime($satalot))/12)*9.5));
 	// Sof zman kria shema (latest time for shema in the morning = Alot + (sha'a * 3)
-		$satshema = date('g:i a', strtotime($satalot)+(((strtotime($sattzet)-strtotime($satalot))/12)*3));
+		$satshema = date('g:ia', strtotime($satalot)+(((strtotime($sattzet)-strtotime($satalot))/12)*3));
 	// Plag Hamincha ("plag") = mincha ketana+((tzet - mincha ketana) / 2)
-		$friplag = date('g:i a', strtotime($friminchkat)+(((strtotime($fritzet))-strtotime($friminchkat))/2));
-		$satplag = date('g:i a', strtotime($satminchkat)+(((strtotime($sattzet))-strtotime($satminchkat))/2));
+		$friplag = date('g:ia', strtotime($friminchkat)+(((strtotime($fritzet))-strtotime($friminchkat))/2));
+		$satplag = date('g:ia', strtotime($satminchkat)+(((strtotime($sattzet))-strtotime($satminchkat))/2));
 	// "winter" mincha = Shkia-20 
 		if ($isearly == 0) { 
 			$candletext = "$candles";
 			$frimincha = date('g:ia', strtotime( $frisunset . " -20 minutes"));
+			$friminchakorb = date('g:ia', strtotime( $frisunset . " -23 minutes"));
+			$friminchaashrei = date('g:ia', strtotime( $frisunset . " -18 minutes"));
+			$friminchatext = $friminchakorb . "/" . $friminchaashrei;
 		} else {
-			$candletext = "$friplag/$candles";
+			$candletext = $friplag. "/" . $candles;
 			$frimincha = date('g:ia', strtotime( $friplag . " -20 minutes"));
+			$friminchatext = date('g:ia', strtotime( $friplag . " -20 minutes"));
 		}
 
 
-//$stuff = "$candles, $frisunset, $frimincha, $satmincha, $satsunset, $satarvit, $sattzet, $latemotzei<br>";
-return [$candletext, $frisunset, $frimincha, $satmincha, $satsunset, $satarvit, $sattzet, $latemotzei];
+//$stuff = "$candles, $frisunset, $friminchatext, $satmincha, $satsunset, $satarvit, $sattzet, $latemotzei<br>";
+return [$candletext, $frisunset, $friminchatext, $satmincha, $satsunset, $satarvit, $sattzet, $latemotzei];
 
 }
 
